@@ -8,6 +8,13 @@ import (
 	"net/http"
 )
 
+var (
+	artistsURL   = "https://groupietrackers.herokuapp.com/api/artists"
+	locationsURL = "https://groupietrackers.herokuapp.com/api/locations"
+	datesURL     = "https://groupietrackers.herokuapp.com/api/dates"
+	relationsURL = "https://groupietrackers.herokuapp.com/api/relation"
+)
+
 type artistsResult struct {
 	data []models.RawArtist
 	err  error
@@ -36,7 +43,7 @@ type RawData struct {
 }
 
 func fetchArtists(ch chan<- artistsResult) {
-	resp, err := http.Get("https://groupietrackers.herokuapp.com/api/artists")
+	resp, err := http.Get(artistsURL)
 	if err != nil {
 		log.Printf("fetchArtists: network error %v", err)
 		ch <- artistsResult{nil, fmt.Errorf("fetch artists: %w", err)}
@@ -60,7 +67,7 @@ func fetchArtists(ch chan<- artistsResult) {
 }
 
 func fetchLocations(ch chan<- locationResult) {
-	resp, err := http.Get("https://groupietrackers.herokuapp.com/api/locations")
+	resp, err := http.Get(locationsURL)
 	if err != nil {
 		log.Printf("fetchLocations: network error %v", err)
 		ch <- locationResult{nil, fmt.Errorf("fetch locations: %w", err)}
@@ -84,7 +91,7 @@ func fetchLocations(ch chan<- locationResult) {
 }
 
 func fetchDates(ch chan<- datesResult) {
-	resp, err := http.Get("https://groupietrackers.herokuapp.com/api/dates")
+	resp, err := http.Get(datesURL)
 	if err != nil {
 		log.Printf("fetchDates: network error %v", err)
 		ch <- datesResult{nil, fmt.Errorf("fetch dates: %w", err)}
@@ -108,7 +115,7 @@ func fetchDates(ch chan<- datesResult) {
 }
 
 func fetchRelations(ch chan<- relationsResult) {
-	resp, err := http.Get("https://groupietrackers.herokuapp.com/api/relation")
+	resp, err := http.Get(relationsURL)
 	if err != nil {
 		log.Printf("fetchRelations: network error %v", err)
 		ch <- relationsResult{nil, fmt.Errorf("fetch relations: %w", err)}

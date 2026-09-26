@@ -52,6 +52,8 @@ type Artist struct {
 	Members          []string
 	CreationDate     int
 	FirstAlbum       string
+	Locations        []string
+	Dates            []string
 	ConcertLocations []ConcertLocation
 }
 

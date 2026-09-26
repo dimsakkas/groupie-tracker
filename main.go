@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"groupie-tracker/internal/fetch"
+	"groupie-tracker/internal/store"
 )
 
 func recoverMiddleware(next http.Handler) http.Handler {
@@ -17,7 +18,6 @@ func recoverMiddleware(next http.Handler) http.Handler {
 			}
 		}()
 		next.ServeHTTP(w, r)
-
 	})
 }
 
@@ -28,14 +28,15 @@ func main() {
 	}
 	log.Printf("fetched %d artists, %d location entries, %d date entries, %d relation entries", len(data.Artists), len(data.Locations), len(data.Dates), len(data.Relations))
 
+	s := store.Build(data)
+	log.Printf("store built: %d artists indexed by ID", len(s.ArtistsByID))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Artists (%d): \n%+v\n\n", len(data.Artists), data.Artists)
-		fmt.Fprintf(w, "Locations (%d): \n%+v\n\n", len(data.Locations), data.Locations)
-		fmt.Fprintf(w, "Dates (%d): \n%+v\n\n", len(data.Dates), data.Dates)
-		fmt.Fprintf(w, "Relations (%d): \n%+v\n\n", len(data.Relations), data.Relations)
+		for id, artist := range s.ArtistsByID {
+			fmt.Fprintf(w, "ID %d: %+v\n\n", id, artist)
+		}
 	})
-
 	log.Println("listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	log.Fatal(http.ListenAndServe(":8080", recoverMiddleware(mux)))
 }

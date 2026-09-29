@@ -68,5 +68,6 @@ type GeoResult struct {
 type SearchEntry struct {
 	Value    string
 	Type     string
+	Context  string
 	ArtistID int
 }

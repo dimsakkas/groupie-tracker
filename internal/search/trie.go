@@ -47,11 +47,27 @@ func (t *Trie) Insert(token string, entry models.SearchEntry) {
 	node.entries = append(node.entries, entry)
 }
 
+// InsertMultiToken splits text on '-', '_' and whitespace and inserts entry
+// under each resulting token. A multi-word value like "north_carolina-usa"
+// becomes reachable from "north", "carolina" AND "usa" individually -- all
+// three point back to the exact same entry.
+func (t *Trie) InsertMultiToken(text string, entry models.SearchEntry) {
+	tokens := strings.FieldsFunc(text, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' '
+	})
+	for _, token := range tokens {
+		t.Insert(token, entry)
+	}
+}
+
 // Search walks to the node matching prefix and collects up to limit
 // entries: the node's own entries first (exact-token matches), then its
 // descendants in alphabetical order (longer completions). limit is a hard
 // cap -- collector never appends past it, unlike a naive "check before,
-// append everything" approach that can silently overshoot.
+// append everything" approach that can silently overshoot. seen dedups: a
+// multi-token insert (see InsertMultiToken) attaches the SAME entry at
+// several different leaf nodes, so a broad prefix that reaches more than
+// one of them would otherwise return that entry more than once.
 func (t *Trie) Search(prefix string, limit int) []models.SearchEntry {
 	prefix = strings.ToLower(prefix)
 	node := t.root
@@ -64,24 +80,25 @@ func (t *Trie) Search(prefix string, limit int) []models.SearchEntry {
 	}
 
 	var results []models.SearchEntry
-	collector(node, limit, &results)
+	seen := make(map[models.SearchEntry]bool)
+	collector(node, limit, &results, seen)
 	return results
 }
 
-func collector(node *TrieNode, limit int, results *[]models.SearchEntry) {
+func collector(node *TrieNode, limit int, results *[]models.SearchEntry, seen map[models.SearchEntry]bool) {
 	if len(*results) >= limit {
 		return
 	}
 
-	remaining := limit - len(*results)
-	if remaining >= len(node.entries) {
-		*results = append(*results, node.entries...)
-	} else {
-		*results = append(*results, node.entries[:remaining]...)
-	}
-
-	if len(*results) >= limit {
-		return
+	for _, entry := range node.entries {
+		if len(*results) >= limit {
+			return
+		}
+		if seen[entry] {
+			continue
+		}
+		seen[entry] = true
+		*results = append(*results, entry)
 	}
 
 	keys := make([]rune, 0, len(node.children))
@@ -91,6 +108,6 @@ func collector(node *TrieNode, limit int, results *[]models.SearchEntry) {
 	slices.Sort(keys)
 
 	for _, ch := range keys {
-		collector(node.children[ch], limit, results)
+		collector(node.children[ch], limit, results, seen)
 	}
 }

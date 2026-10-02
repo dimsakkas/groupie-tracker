@@ -61,7 +61,9 @@ type GeoResult struct {
 	Location string
 	Lat      float64
 	Lng      float64
+	City     string
 	State    string
+	Country  string
 	Resolved bool
 }
 

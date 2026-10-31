@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// Cache keeps geocoding results in memory and on disk.
+// It is an optimization, never a dependency: if it is missing or corrupted, we start fresh.
 type Cache struct {
 	path string
 	data map[string]models.GeoResult
@@ -32,6 +34,7 @@ func LoadCache(path string) *Cache {
 	defer file.Close()
 	err = json.NewDecoder(file).Decode(&c.data)
 	if err != nil {
+		log.Printf("corrupted geocache at %s, removing: %v", path, err)
 		os.Remove(c.path)
 		c.data = make(map[string]models.GeoResult)
 		return c
@@ -39,6 +42,8 @@ func LoadCache(path string) *Cache {
 	return c
 }
 
+// Save writes to a .tmp file first and then renames it, so a crash in the middle
+// of the write can never corrupt the real file.
 func (c *Cache) Save() error {
 	dir := filepath.Dir(c.path)
 	err := os.MkdirAll(dir, 0755)
@@ -74,12 +79,12 @@ func (c *Cache) Save() error {
 func (c *Cache) Get(location string) (models.GeoResult, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	coord, ok := c.data[location]
-	return coord, ok
+	result, ok := c.data[location]
+	return result, ok
 }
 
-func (c *Cache) Set(location string, coord models.GeoResult) {
+func (c *Cache) Set(location string, result models.GeoResult) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.data[location] = coord
+	c.data[location] = result
 }

@@ -1,301 +1,192 @@
 package store
 
 import (
-	"groupie-tracker/internal/fetch"
 	"groupie-tracker/internal/models"
+	"slices"
+	"sync"
 	"testing"
 )
 
-// findArtist is a small test helper: linear search by ID over the slice
-// BuildArtists returns, since BuildArtists itself only returns a []Artist,
-// not a lookup map (that's what Store.ArtistsByID is for, tested separately
-// in TestStoreBuild_ArtistsByID_Lookup below).
-func findArtist(artists []models.Artist, id int) (models.Artist, bool) {
-	for _, a := range artists {
-		if a.ID == id {
-			return a, true
-		}
+func fakeMembers(n int) []string {
+	names := make([]string, n)
+	for i := range names {
+		names[i] = "member"
 	}
-	return models.Artist{}, false
+	return names
 }
 
-// testRawData is one shared fixture reused across every test in this file.
-// It is built directly as Go structs (not JSON) because by the time raw
-// data reaches store.BuildArtists, fetch.FetchAll has already decoded it —
-// so we test at the boundary this package actually owns: RawData in,
-// []models.Artist out.
-//
-// Artist 1 (Queen)          -> exercises the "members" join
-// Artist 2 (Gorillaz)       -> exercises firstAlbum passthrough
-// Artist 3 (Foo Fighters)   -> exercises a second, different-sized members join
-// Artist 4 (Travis Scott)   -> exercises the relations -> ConcertLocations join
-//
-//	with exactly 10 concert locations
-//
-// Artist 5 (Ghost Artist)   -> deliberately has NO entry in Locations, Dates,
-//
-//	or Relations, to prove BuildArtists degrades
-//	gracefully (nil fields) instead of panicking
-var testRawData = fetch.RawData{
-	Artists: []models.RawArtist{
-		{
-			ID:   1,
-			Name: "Queen",
-			Members: []string{
-				"Freddie Mercury", "Brian May", "Roger Taylor", "John Deacon",
-				"Spike Edney", "Neil Fairclough", "Rufus Tiger Taylor",
-			},
-			CreationDate: 1970,
-			FirstAlbum:   "13-07-1973",
-			Image:        "queen.jpg",
+// filterFixture: 4 artists covering every filter case.
+// Deliberately shuffled by ID, so the ordering is tested too.
+func filterFixture() *Store {
+	return newStore([]models.Artist{
+		{ID: 3, Name: "C", CreationDate: 2007, FirstAlbum: "27-06-2013", Members: fakeMembers(1),
+			Locations: []string{"north_carolina-usa", "texas-usa"}},
+		{ID: 1, Name: "A", CreationDate: 1970, FirstAlbum: "14-12-1973", Members: fakeMembers(4),
+			Locations: []string{"london-uk", "texas-usa"}},
+		{ID: 4, Name: "D", CreationDate: 1980, FirstAlbum: "bad-date", Members: fakeMembers(6),
+			Locations: []string{"paris-france"}},
+		{ID: 2, Name: "B", CreationDate: 1994, FirstAlbum: "05-03-1996", Members: fakeMembers(5),
+			Locations: []string{"seattle-usa", "washington-usa"}},
+	})
+}
+
+func TestNewStore_ArtistsOrderedByID(t *testing.T) {
+	s := filterFixture()
+	var got []int
+	for _, a := range s.Artists {
+		got = append(got, a.ID)
+	}
+	if !slices.Equal(got, []int{1, 2, 3, 4}) {
+		t.Fatalf("Artists order = %v, want [1 2 3 4]", got)
+	}
+	if s.ArtistsByID[2].Name != "B" {
+		t.Errorf("ArtistsByID[2] = %+v", s.ArtistsByID[2])
+	}
+}
+
+func TestFilter(t *testing.T) {
+	s := filterFixture()
+	tests := []struct {
+		name string
+		p    FilterParams
+		want []int
+	}{
+		{"no filters returns everyone in ID order", FilterParams{}, []int{1, 2, 3, 4}},
+		{"creation range", FilterParams{CreationMin: 1990, CreationMax: 2010}, []int{2, 3}},
+		{"creation min only", FilterParams{CreationMin: 1990}, []int{2, 3}},
+		{"creation max only", FilterParams{CreationMax: 1980}, []int{1, 4}},
+		{"first album range", FilterParams{FirstAlbumMin: 1990, FirstAlbumMax: 2000}, []int{2}},
+		{"first album min only", FilterParams{FirstAlbumMin: 2000}, []int{3}},
+		{"members", FilterParams{Members: []int{4, 6}}, []int{1, 4}},
+		{"location exact string", FilterParams{Locations: []string{"texas-usa"}}, []int{1, 3}},
+		{"location by state name only", FilterParams{Locations: []string{"texas"}}, []int{1, 3}},
+		{"location with underscore as space", FilterParams{Locations: []string{"north carolina"}}, []int{3}},
+		{"location is case-insensitive", FilterParams{Locations: []string{"TEXAS"}}, []int{1, 3}},
+		{"several locations are OR", FilterParams{Locations: []string{"london", "paris"}}, []int{1, 4}},
+		{"empty location term is ignored", FilterParams{Locations: []string{"", "  "}}, []int{1, 2, 3, 4}},
+		{"different filters are AND", FilterParams{CreationMin: 2000, Locations: []string{"texas"}}, []int{3}},
+		{"nothing matches", FilterParams{Locations: []string{"atlantis"}}, []int{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := s.Filter(tc.p)
+			if got == nil {
+				t.Fatal("Filter returned nil, want a non-nil slice (JSON [] not null)")
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFilter_MalformedFirstAlbumNeverPanics(t *testing.T) {
+	s := newStore([]models.Artist{
+		{ID: 1, FirstAlbum: ""},
+		{ID: 2, FirstAlbum: "2001"},
+		{ID: 3, FirstAlbum: "not-a-date"},
+		{ID: 4, FirstAlbum: "01-01-1999"},
+	})
+	// With a year bound, malformed values are excluded and nothing panics.
+	got := s.Filter(FilterParams{FirstAlbumMin: 1990})
+	if !slices.Equal(got, []int{4}) {
+		t.Errorf("got %v, want [4]", got)
+	}
+	// Without a year bound, FirstAlbum is not even read.
+	if got := s.Filter(FilterParams{}); len(got) != 4 {
+		t.Errorf("got %v, want all 4 artists", got)
+	}
+}
+
+func TestUniqueLocations_DedupedAndSorted(t *testing.T) {
+	got := filterFixture().UniqueLocations()
+	want := []string{"london-uk", "north_carolina-usa", "paris-france", "seattle-usa", "texas-usa", "washington-usa"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func geoFixture() *Store {
+	return newStore([]models.Artist{{
+		ID: 1,
+		ConcertLocations: []models.ConcertLocation{
+			{Location: "london-uk", Dates: []string{"10-06-2019"}},
+			{Location: "paris-france", Dates: []string{"*03-04-2020", "01-02-2018"}}, // the earliest date is 2018
+			{Location: "nowhere-xx", Dates: []string{"01-01-2017"}},                  // not geocoded
+			{Location: "rome-italy", Dates: []string{"garbage"}},                     // unparseable date: sorts last
 		},
-		{
-			ID:           2,
-			Name:         "Gorillaz",
-			Members:      []string{"2D", "Murdoc Niccals", "Noodle", "Russel Hobbs"},
-			CreationDate: 1998,
-			FirstAlbum:   "26-03-2001",
-			Image:        "gorillaz.jpg",
-		},
-		{
-			ID:   3,
-			Name: "Foo Fighters",
-			Members: []string{
-				"Dave Grohl", "Nate Mendel", "Pat Smear",
-				"Chris Shiflett", "Rami Jaffee", "Josh Freese",
-			},
-			CreationDate: 1994,
-			FirstAlbum:   "04-07-1995",
-			Image:        "foofighters.jpg",
-		},
-		{
-			ID:           4,
-			Name:         "Travis Scott",
-			Members:      []string{"Travis Scott"},
-			CreationDate: 2007,
-			FirstAlbum:   "27-06-2013",
-			Image:        "travisscott.jpg",
-		},
-		{
-			ID:           5,
-			Name:         "Ghost Artist",
-			Members:      []string{"Nobody"},
-			CreationDate: 2020,
-			FirstAlbum:   "01-01-2020",
-			Image:        "ghost.jpg",
-		},
-	},
-	Locations: []models.RawLocationResp{
-		{ID: 1, Locations: []string{"london-uk", "wembley-uk"}},
-		{ID: 2, Locations: []string{"gorillaz_hq-uk"}},
-		{ID: 3, Locations: []string{"seattle-usa"}},
-		{ID: 4, Locations: []string{
-			"houston-usa", "new_york-usa", "los_angeles-usa", "chicago-usa",
-			"miami-usa", "atlanta-usa", "dallas-usa", "boston-usa",
-			"denver-usa", "las_vegas-usa",
-		}},
-		// deliberately no entry for ID 5
-	},
-	Dates: []models.RawDatesResp{
-		{ID: 1, Dates: []string{"*01-01-2020"}},
-		{ID: 2, Dates: []string{"*02-02-2020"}},
-		{ID: 3, Dates: []string{"*03-03-2020"}},
-		{ID: 4, Dates: []string{"*04-04-2020"}},
-		// deliberately no entry for ID 5
-	},
-	Relations: []models.RawRelationsResp{
-		{ID: 1, DatesLocations: map[string][]string{
-			"london-uk": {"01-01-2020"},
-		}},
-		{ID: 2, DatesLocations: map[string][]string{
-			"gorillaz_hq-uk": {"02-02-2020"},
-		}},
-		{ID: 3, DatesLocations: map[string][]string{
-			"seattle-usa": {"03-03-2020"},
-		}},
-		{ID: 4, DatesLocations: map[string][]string{
-			"houston-usa":     {"10-04-2023"},
-			"new_york-usa":    {"11-04-2023"},
-			"los_angeles-usa": {"12-04-2023"},
-			"chicago-usa":     {"13-04-2023"},
-			"miami-usa":       {"14-04-2023"},
-			"atlanta-usa":     {"15-04-2023"},
-			"dallas-usa":      {"16-04-2023"},
-			"boston-usa":      {"17-04-2023"},
-			"denver-usa":      {"18-04-2023"},
-			"las_vegas-usa":   {"19-04-2023"},
-		}},
-		// deliberately no entry for ID 5
-	},
+	}, {ID: 2}})
 }
 
-func TestBuildArtists_QueenMembers(t *testing.T) {
-	artists := BuildArtists(testRawData)
-
-	queen, ok := findArtist(artists, 1)
-	if !ok {
-		t.Fatal("Queen (ID 1) not found in BuildArtists result")
-	}
-
-	if len(queen.Members) != 7 {
-		t.Fatalf("expected Queen to have 7 members, got %d: %+v", len(queen.Members), queen.Members)
-	}
-
-	want := map[string]bool{
-		"Freddie Mercury": true, "Brian May": true, "Roger Taylor": true,
-		"John Deacon": true, "Spike Edney": true, "Neil Fairclough": true,
-		"Rufus Tiger Taylor": true,
-	}
-	for _, m := range queen.Members {
-		if !want[m] {
-			t.Errorf("unexpected member in Queen's list: %q", m)
-		}
+func geoResults() map[string]models.GeoResult {
+	return map[string]models.GeoResult{
+		"london-uk":    {Location: "london-uk", Lat: 51.5, Lng: -0.12, Resolved: true},
+		"paris-france": {Location: "paris-france", Lat: 48.8, Lng: 2.35, Resolved: true},
+		"rome-italy":   {Location: "rome-italy", Lat: 41.9, Lng: 12.5, Resolved: true},
 	}
 }
 
-func TestBuildArtists_GorillazFirstAlbum(t *testing.T) {
-	artists := BuildArtists(testRawData)
-
-	gorillaz, ok := findArtist(artists, 2)
-	if !ok {
-		t.Fatal("Gorillaz (ID 2) not found in BuildArtists result")
+func TestGeoFor_NotReadyYet(t *testing.T) {
+	coords, ready, found := geoFixture().GeoFor(1)
+	if ready || !found {
+		t.Fatalf("ready=%v found=%v, want ready=false found=true", ready, found)
 	}
-
-	if gorillaz.FirstAlbum != "26-03-2001" {
-		t.Fatalf("expected Gorillaz firstAlbum to be %q, got %q", "26-03-2001", gorillaz.FirstAlbum)
+	if coords == nil || len(coords) != 0 {
+		t.Errorf("coords = %#v, want empty non-nil slice", coords)
 	}
 }
 
-func TestBuildArtists_FooFightersMembers(t *testing.T) {
-	artists := BuildArtists(testRawData)
-
-	ff, ok := findArtist(artists, 3)
-	if !ok {
-		t.Fatal("Foo Fighters (ID 3) not found in BuildArtists result")
-	}
-
-	if len(ff.Members) != 6 {
-		t.Fatalf("expected Foo Fighters to have 6 members, got %d: %+v", len(ff.Members), ff.Members)
+func TestGeoFor_UnknownArtist(t *testing.T) {
+	_, _, found := geoFixture().GeoFor(999)
+	if found {
+		t.Fatal("unknown artist must report found=false")
 	}
 }
 
-func TestBuildArtists_TravisScottConcertLocations_ExactSet(t *testing.T) {
-	artists := BuildArtists(testRawData)
+func TestGeoFor_ChronologicalAndSkipsUnresolved(t *testing.T) {
+	s := geoFixture()
+	s.SetGeo(geoResults())
 
-	ts, ok := findArtist(artists, 4)
-	if !ok {
-		t.Fatal("Travis Scott (ID 4) not found in BuildArtists result")
+	coords, ready, found := s.GeoFor(1)
+	if !ready || !found {
+		t.Fatalf("ready=%v found=%v, want both true", ready, found)
 	}
-
-	want := map[string]bool{
-		"houston-usa": true, "new_york-usa": true, "los_angeles-usa": true,
-		"chicago-usa": true, "miami-usa": true, "atlanta-usa": true,
-		"dallas-usa": true, "boston-usa": true, "denver-usa": true,
-		"las_vegas-usa": true,
+	var got []string
+	for _, c := range coords {
+		got = append(got, c.Location)
 	}
-
-	if len(ts.ConcertLocations) != len(want) {
-		t.Fatalf("expected exactly %d concert locations for Travis Scott, got %d: %+v",
-			len(want), len(ts.ConcertLocations), ts.ConcertLocations)
-	}
-
-	// Map iteration order is non-deterministic in Go, so we can't compare
-	// slices directly -- we compare the *set* of locations instead.
-	got := make(map[string]bool, len(ts.ConcertLocations))
-	for _, c := range ts.ConcertLocations {
-		got[c.Location] = true
-	}
-
-	for loc := range want {
-		if !got[loc] {
-			t.Errorf("expected concert location %q missing from Travis Scott's result", loc)
-		}
-	}
-	for loc := range got {
-		if !want[loc] {
-			t.Errorf("unexpected concert location %q found in Travis Scott's result", loc)
-		}
+	want := []string{"paris-france", "london-uk", "rome-italy"}
+	if !slices.Equal(got, want) {
+		t.Errorf("order = %v, want %v", got, want)
 	}
 }
 
-func TestBuildArtists_RawLocationsAndDatesFieldsPopulated(t *testing.T) {
-	artists := BuildArtists(testRawData)
-
-	queen, ok := findArtist(artists, 1)
-	if !ok {
-		t.Fatal("Queen (ID 1) not found in BuildArtists result")
-	}
-
-	wantLocations := []string{"london-uk", "wembley-uk"}
-	if len(queen.Locations) != len(wantLocations) {
-		t.Fatalf("expected %d raw locations, got %d: %+v", len(wantLocations), len(queen.Locations), queen.Locations)
-	}
-	for i, loc := range wantLocations {
-		if queen.Locations[i] != loc {
-			t.Errorf("Locations[%d]: expected %q, got %q", i, loc, queen.Locations[i])
-		}
-	}
-
-	wantDates := []string{"*01-01-2020"}
-	if len(queen.Dates) != len(wantDates) {
-		t.Fatalf("expected %d raw dates, got %d: %+v", len(wantDates), len(queen.Dates), queen.Dates)
-	}
-	for i, d := range wantDates {
-		if queen.Dates[i] != d {
-			t.Errorf("Dates[%d]: expected %q, got %q", i, d, queen.Dates[i])
-		}
+func TestGeoFor_ReadyButArtistWithoutConcerts(t *testing.T) {
+	s := geoFixture()
+	s.SetGeo(geoResults())
+	coords, ready, found := s.GeoFor(2)
+	if !ready || !found || coords == nil || len(coords) != 0 {
+		t.Errorf("coords=%#v ready=%v found=%v, want empty non-nil, true, true", coords, ready, found)
 	}
 }
 
-func TestBuildArtists_MissingLocationsAndDates_DoesNotPanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("BuildArtists panicked on an artist with no locations/dates/relations entry: %v", r)
-		}
-	}()
-
-	artists := BuildArtists(testRawData)
-
-	ghost, ok := findArtist(artists, 5)
-	if !ok {
-		t.Fatal("Ghost Artist (ID 5) not found in BuildArtists result")
+// Run this with -race: if the lock is missing, the race detector will complain.
+func TestGeoFor_ConcurrentReadsWhileSetGeo(t *testing.T) {
+	s := geoFixture()
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				coords, ready, _ := s.GeoFor(1)
+				if ready && len(coords) != 3 {
+					t.Errorf("ready but %d coords", len(coords))
+					return
+				}
+			}
+		}()
 	}
-
-	if ghost.Locations != nil {
-		t.Errorf("expected nil Locations for an artist with no locations entry, got %+v", ghost.Locations)
-	}
-	if ghost.Dates != nil {
-		t.Errorf("expected nil Dates for an artist with no dates entry, got %+v", ghost.Dates)
-	}
-	if len(ghost.ConcertLocations) != 0 {
-		t.Errorf("expected 0 ConcertLocations for an artist with no relations entry, got %+v", ghost.ConcertLocations)
-	}
-}
-
-func TestStoreBuild_ArtistsByID_Lookup(t *testing.T) {
-	s := Build(testRawData)
-
-	if len(s.ArtistsByID) != len(testRawData.Artists) {
-		t.Fatalf("expected %d artists in ArtistsByID, got %d", len(testRawData.Artists), len(s.ArtistsByID))
-	}
-
-	queen, ok := s.ArtistsByID[1]
-	if !ok {
-		t.Fatal("expected ArtistsByID[1] to exist")
-	}
-	if queen.Name != "Queen" {
-		t.Errorf("expected ArtistsByID[1].Name to be %q, got %q", "Queen", queen.Name)
-	}
-
-	travisScott, ok := s.ArtistsByID[4]
-	if !ok {
-		t.Fatal("expected ArtistsByID[4] to exist")
-	}
-	if travisScott.Name != "Travis Scott" {
-		t.Errorf("expected ArtistsByID[4].Name to be %q, got %q", "Travis Scott", travisScott.Name)
-	}
-
-	if _, ok := s.ArtistsByID[999]; ok {
-		t.Error("expected ArtistsByID[999] to not exist")
-	}
+	s.SetGeo(geoResults())
+	wg.Wait()
 }

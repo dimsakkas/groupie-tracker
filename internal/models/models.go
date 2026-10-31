@@ -58,18 +58,18 @@ type Artist struct {
 }
 
 type GeoResult struct {
-	Location string
-	Lat      float64
-	Lng      float64
-	City     string
-	State    string
-	Country  string
-	Resolved bool
+	Location string  `json:"location"`
+	Lat      float64 `json:"lat"`
+	Lng      float64 `json:"lng"`
+	City     string  `json:"city"`
+	State    string  `json:"state"`
+	Country  string  `json:"country"`
+	Resolved bool    `json:"resolved"`
 }
 
 type SearchEntry struct {
-	Value    string
-	Type     string
-	Context  string
-	ArtistID int
+	Value    string `json:"value"`
+	Type     string `json:"type"`
+	Context  string `json:"context"`
+	ArtistID int    `json:"artist_id"`
 }

@@ -1,0 +1,117 @@
+{{define "scripts"}}
+  <script src="/static/js/favorites.js" defer></script>
+  <script src="/static/js/filters.js" defer></script>
+  <script src="/static/js/map.js" defer></script>
+  <script src="/static/js/worldmap.js" defer></script>
+{{end}}
+
+{{define "content"}}
+<h1 class="page-title">Artists</h1>
+
+<div class="with-sidebar">
+  <aside class="filters" id="filters" aria-label="Filters">
+    <button type="button" id="filters-toggle" class="btn filters-toggle" aria-expanded="false" aria-controls="filter-form">Filters</button>
+
+    <form id="filter-form" autocomplete="off">
+      <div class="filters-head">
+        <h2>Filters</h2>
+        <button type="button" id="clear-filters" class="btn btn-secondary">Clear all</button>
+      </div>
+
+      <fieldset>
+        <legend>Creation year: <output id="creation-out">{{.Filters.CreationMin}} – {{.Filters.CreationMax}}</output></legend>
+        <div class="range-row">
+          <label for="creation_min">From</label>
+          <input type="range" id="creation_min" name="creation_min" data-group="creation" data-end="min"
+                 min="{{.Filters.CreationMin}}" max="{{.Filters.CreationMax}}" value="{{.Filters.CreationMin}}">
+        </div>
+        <div class="range-row">
+          <label for="creation_max">To</label>
+          <input type="range" id="creation_max" name="creation_max" data-group="creation" data-end="max"
+                 min="{{.Filters.CreationMin}}" max="{{.Filters.CreationMax}}" value="{{.Filters.CreationMax}}">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>First album year: <output id="album-out">{{.Filters.AlbumMin}} – {{.Filters.AlbumMax}}</output></legend>
+        <div class="range-row">
+          <label for="first_album_min">From</label>
+          <input type="range" id="first_album_min" name="first_album_min" data-group="album" data-end="min"
+                 min="{{.Filters.AlbumMin}}" max="{{.Filters.AlbumMax}}" value="{{.Filters.AlbumMin}}">
+        </div>
+        <div class="range-row">
+          <label for="first_album_max">To</label>
+          <input type="range" id="first_album_max" name="first_album_max" data-group="album" data-end="max"
+                 min="{{.Filters.AlbumMin}}" max="{{.Filters.AlbumMax}}" value="{{.Filters.AlbumMax}}">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Number of members</legend>
+        <div class="pills">
+          {{range .Filters.MemberCounts}}
+          <label class="pill"><input type="checkbox" name="members" value="{{.}}"><span>{{.}}</span></label>
+          {{end}}
+        </div>
+      </fieldset>
+
+      <fieldset class="locations">
+        <legend>Concert locations</legend>
+        <label class="visually-hidden" for="loc-search">Find a country or city</label>
+        <input type="search" id="loc-search" class="loc-search" placeholder="Find a country or city" autocomplete="off">
+        <div class="country-list" id="country-list">
+          {{range .Filters.Countries}}
+          <div class="country">
+            <input type="checkbox" class="country-box" aria-label="All locations in {{.Name}}">
+            <details>
+              <summary><span class="country-name">{{.Name}}</span> <span class="muted">({{len .Cities}})</span></summary>
+              <ul>
+                {{range .Cities}}
+                <li><label><input type="checkbox" name="location" value="{{.Value}}"> <span class="city-name">{{.Label}}</span></label></li>
+                {{end}}
+              </ul>
+            </details>
+          </div>
+          {{end}}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Favorites</legend>
+        <label class="check"><input type="checkbox" id="fav-only"> Show favorites only (<span id="fav-count">0</span>)</label>
+      </fieldset>
+    </form>
+  </aside>
+
+  <section class="results" id="results" aria-busy="false">
+    <div class="results-head">
+      <p class="count" id="status" role="status" aria-live="polite">{{len .Artists}} artists</p>
+      <span class="spinner" id="loading" role="img" aria-label="Updating results" hidden></span>
+      <button type="button" id="world-toggle" class="btn btn-secondary" aria-expanded="false" aria-controls="world">Show world map</button>
+    </div>
+
+    <div id="world" class="world" hidden>
+      <p id="world-status" class="muted" role="status">Loading map…</p>
+      <div id="world-map" class="map" aria-label="Map of all concert locations"></div>
+    </div>
+
+    <p id="empty" class="empty" hidden>
+      No artists match these filters.
+      <button type="button" id="empty-clear" class="btn btn-secondary">Clear all filters</button>
+    </p>
+
+    <ul class="grid" id="artist-grid">
+      {{range .Artists}}
+      <li class="card" data-id="{{.ID}}" data-name="{{.Name}}">
+        <button type="button" class="fav" data-id="{{.ID}}" data-name="{{.Name}}" aria-pressed="false" aria-label="Add {{.Name}} to favorites"><span aria-hidden="true">♡</span></button>
+        <a href="/artist/{{.ID}}">
+          <img src="{{.Image}}" alt="{{.Name}}" width="300" height="300" loading="lazy">
+          <h2>{{.Name}}</h2>
+          <p>Since {{.CreationDate}} &middot; {{len .Members}} {{if eq (len .Members) 1}}member{{else}}members{{end}}</p>
+        </a>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+</div>
+{{end}}

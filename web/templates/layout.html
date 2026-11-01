@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{block "title" .}}Groupie Tracker{{end}}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/">Groupie Tracker</a>
+
+      <!-- Plain GET form: works without JavaScript. search.js adds live suggestions. -->
+      <form class="site-search" action="/search" method="get" role="search">
+        <label class="visually-hidden" for="search">Search artists, members, locations and dates</label>
+        <input type="search" id="search" name="q" autocomplete="off"
+               placeholder="Search artists, members, locations, dates…  (press /)"
+               role="combobox" aria-expanded="false" aria-controls="suggestions" aria-autocomplete="list">
+        <button type="submit" class="btn btn-light">Search</button>
+        <ul id="suggestions" class="suggestions" role="listbox" aria-label="Suggestions" hidden></ul>
+      </form>
+
+      <nav class="site-nav" aria-label="Main">
+        <a href="/">Artists</a>
+        <a href="/compare">Compare</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    {{template "content" .}}
+  </main>
+
+  <script src="/static/js/search.js" defer></script>
+  {{block "scripts" .}}{{end}}
+</body>
+</html>

@@ -1,0 +1,67 @@
+{{define "title"}}{{.Artist.Name}} · Groupie Tracker{{end}}
+
+{{define "scripts"}}
+  <script src="/static/js/favorites.js" defer></script>
+  <script src="/static/js/map.js" defer></script>
+{{end}}
+
+{{define "content"}}
+<p class="back"><a href="/">&larr; All artists</a></p>
+
+<article class="artist" data-artist-id="{{.Artist.ID}}">
+  <header class="artist-head">
+    <img class="artist-img" src="{{.Artist.Image}}" alt="{{.Artist.Name}}" width="300" height="300">
+    <div class="artist-info">
+      <div class="title-row">
+        <h1>{{.Artist.Name}}</h1>
+        <button type="button" class="fav fav-large" data-id="{{.Artist.ID}}" data-name="{{.Artist.Name}}" aria-pressed="false" aria-label="Add {{.Artist.Name}} to favorites"><span aria-hidden="true">♡</span></button>
+      </div>
+
+      <dl class="facts">
+        <dt>Created</dt><dd>{{.Artist.CreationDate}}</dd>
+        <dt>First album</dt><dd>{{.Artist.FirstAlbum}}</dd>
+        <dt>Members ({{len .Artist.Members}})</dt>
+        <dd><ul class="members">{{range .Artist.Members}}<li>{{.}}</li>{{end}}</ul></dd>
+        <dt>Concerts</dt><dd>{{.ShowCount}} {{if eq .ShowCount 1}}show{{else}}shows{{end}} in {{len .Concerts}} {{if eq (len .Concerts) 1}}location{{else}}locations{{end}}</dd>
+        <dt>Tour distance</dt><dd id="distance">Calculating…</dd>
+      </dl>
+
+      <form class="compare-inline" action="/compare" method="get">
+        <input type="hidden" name="a" value="{{.Artist.ID}}">
+        <label for="cmp-b">Compare with</label>
+        <select id="cmp-b" name="b" required>
+          <option value="">Choose an artist…</option>
+          {{range .Others}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+        </select>
+        <button type="submit" class="btn">Compare</button>
+      </form>
+    </div>
+  </header>
+
+  <section class="tour" aria-labelledby="map-title">
+    <h2 id="map-title">Tour map</h2>
+    <p id="map-status" class="muted" role="status">Loading map…</p>
+    <div class="map-controls">
+      <button type="button" id="play" class="btn" disabled>&#9654; Play tour</button>
+      <span id="play-info" class="muted" role="status" aria-live="polite"></span>
+    </div>
+    <div id="map" class="map" aria-label="Map of {{.Artist.Name}} concert locations"></div>
+  </section>
+
+  <section aria-labelledby="concerts-title">
+    <h2 id="concerts-title">Concerts</h2>
+    {{if .Concerts}}
+    <ol class="concerts">
+      {{range .Concerts}}
+      <li>
+        <h3>{{.Location}}</h3>
+        <ul class="dates">{{range .Dates}}<li>{{.}}</li>{{end}}</ul>
+      </li>
+      {{end}}
+    </ol>
+    {{else}}
+    <p class="muted">No concerts listed.</p>
+    {{end}}
+  </section>
+</article>
+{{end}}

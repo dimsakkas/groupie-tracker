@@ -7,8 +7,10 @@ import (
 	"groupie-tracker/internal/models"
 	"groupie-tracker/internal/store"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -16,6 +18,85 @@ import (
 // suggestLimit caps the autocomplete dropdown: more than 10 entries is
 // scroll-hell for the user and an unbounded response for the server.
 const suggestLimit = 10
+
+// searchPoolSize is how many raw trie hits searchEntries collects before it
+// sorts and truncates them. The trie walks its children in random map order,
+// so without a larger pool the visible results would change between requests.
+const searchPoolSize = 1000
+
+// searchTypeRank orders result types: the artist itself first, dates last.
+var searchTypeRank = map[string]int{
+	"artist": 0, "member": 1, "location": 2, "creation_date": 3, "first_album_date": 4,
+}
+
+func isSearchSeparator(r rune) bool { return r == ' ' || r == '-' || r == '_' }
+
+// searchEntries answers a query that may contain several words
+// ("billie joe", "london-uk", "05-08-1967"). The trie only knows single
+// tokens, so we look up the first token and keep the hits in which every other
+// token is the prefix of some word. The result is sorted (type, then value,
+// then artist) so it is the same on every request.
+//
+// With collapse=true, location and date entries are reduced to one per
+// (type, value): the dropdown wants "Japan" once, not once per artist.
+func (srv *Server) searchEntries(q string, limit int, collapse bool) []models.SearchEntry {
+	tokens := strings.FieldsFunc(strings.ToLower(q), isSearchSeparator)
+	if len(tokens) == 0 {
+		return []models.SearchEntry{}
+	}
+
+	hits := srv.Trie.Search(tokens[0], searchPoolSize)
+	out := make([]models.SearchEntry, 0, len(hits))
+	for _, entry := range hits {
+		if hasWordPrefixes(entry.Value, tokens[1:]) {
+			out = append(out, entry)
+		}
+	}
+
+	slices.SortFunc(out, func(a, b models.SearchEntry) int {
+		if c := searchTypeRank[a.Type] - searchTypeRank[b.Type]; c != 0 {
+			return c
+		}
+		if c := strings.Compare(strings.ToLower(a.Value), strings.ToLower(b.Value)); c != 0 {
+			return c
+		}
+		return a.ArtistID - b.ArtistID
+	})
+
+	if collapse {
+		type key struct{ typ, value string }
+		seen := make(map[key]bool)
+		out = slices.DeleteFunc(out, func(e models.SearchEntry) bool {
+			if e.Type == "artist" || e.Type == "member" {
+				return false
+			}
+			k := key{e.Type, e.Value}
+			dup := seen[k]
+			seen[k] = true
+			return dup
+		})
+	}
+
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+// hasWordPrefixes reports whether every token is the prefix of some word of
+// value (words are separated like in the trie).
+func hasWordPrefixes(value string, tokens []string) bool {
+	if len(tokens) == 0 {
+		return true
+	}
+	words := strings.FieldsFunc(strings.ToLower(value), isSearchSeparator)
+	for _, token := range tokens {
+		if !slices.ContainsFunc(words, func(w string) bool { return strings.HasPrefix(w, token) }) {
+			return false
+		}
+	}
+	return true
+}
 
 // writeJSON encodes v into a buffer first and writes it only on success, so an
 // encoding error can never leave a half-written JSON body behind.
@@ -46,11 +127,8 @@ func (srv *Server) SuggestHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, []models.SearchEntry{})
 		return
 	}
-	results := srv.Trie.Search(q, suggestLimit)
-	if results == nil {
-		results = []models.SearchEntry{} // JSON [] and not null
-	}
-	writeJSON(w, http.StatusOK, results)
+	// searchEntries never returns nil, so the JSON is [] and not null.
+	writeJSON(w, http.StatusOK, srv.searchEntries(q, suggestLimit, true))
 }
 
 // FilterHandler serves GET /api/filter?... and returns only the IDs of the
@@ -86,7 +164,19 @@ func (srv *Server) GeoHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct {
 		Ready       bool               `json:"ready"`
 		Coordinates []models.GeoResult `json:"coordinates"`
-	}{ready, coords})
+		DistanceKm  int                `json:"distance_km"`
+	}{ready, coords, int(math.Round(store.PathLengthKm(coords)))})
+}
+
+// WorldGeoHandler serves GET /api/geo: every geocoded concert location once,
+// with the IDs of the artists that play there. The home page map uses it and
+// hides the artists that the filters exclude.
+func (srv *Server) WorldGeoHandler(w http.ResponseWriter, r *http.Request) {
+	points, ready := srv.Store.WorldPoints()
+	writeJSON(w, http.StatusOK, struct {
+		Ready     bool               `json:"ready"`
+		Locations []store.WorldPoint `json:"locations"`
+	}{ready, points})
 }
 
 // parseFilterParams reads the filter query string:

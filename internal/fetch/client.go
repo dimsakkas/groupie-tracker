@@ -4,135 +4,174 @@ import (
 	"encoding/json"
 	"fmt"
 	"groupie-tracker/internal/models"
+	"log"
 	"net/http"
-	"sync"
 )
 
-const ArtistURL = "https://groupietrackers.herokuapp.com/api/artists"
-const LocationURL = "https://groupietrackers.herokuapp.com/api/locations"
-const DatesURL = "https://groupietrackers.herokuapp.com/api/dates"
-const RelationURL = "https://groupietrackers.herokuapp.com/api/relation"
+var (
+	artistsURL   = "https://groupietrackers.01edu.ai/api/artists"
+	locationsURL = "https://groupietrackers.01edu.ai/api/locations"
+	datesURL     = "https://groupietrackers.01edu.ai/api/dates"
+	relationsURL = "https://groupietrackers.01edu.ai/api/relation"
+)
+
+type artistsResult struct {
+	data []models.RawArtist
+	err  error
+}
+
+type locationResult struct {
+	data []models.RawLocationResp
+	err  error
+}
+
+type datesResult struct {
+	data []models.RawDatesResp
+	err  error
+}
+
+type relationsResult struct {
+	data []models.RawRelationsResp
+	err  error
+}
 
 type RawData struct {
-	Artists   []models.Artist
-	Locations models.LocationsIndex
-	Dates     models.DatesIndex
-	Relations models.RelationsIndex
+	Artists   []models.RawArtist
+	Locations []models.RawLocationResp
+	Dates     []models.RawDatesResp
+	Relations []models.RawRelationsResp
 }
 
-func FetchArtists() ([]models.Artist, error) {
-	resp, err := http.Get(ArtistURL)
+func fetchArtists(ch chan<- artistsResult) {
+	resp, err := http.Get(artistsURL)
 	if err != nil {
-		return nil, err
+		log.Printf("fetchArtists: network error %v", err)
+		ch <- artistsResult{nil, fmt.Errorf("fetch artists: %w", err)}
+		return
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Unexpected status code: %d", resp.StatusCode)
+		log.Printf("fetchArtists: bad status %d", resp.StatusCode)
+		ch <- artistsResult{err: fmt.Errorf("fetch artists: status %d", resp.StatusCode)}
+		return
 	}
-	var artists []models.Artist
-	err = json.NewDecoder(resp.Body).Decode(&artists)
-	if err != nil {
-		return nil, err
+
+	var artists []models.RawArtist
+	if err := json.NewDecoder(resp.Body).Decode(&artists); err != nil {
+		log.Printf("fetchArtists: decode error %v", err)
+		ch <- artistsResult{err: fmt.Errorf("decode artists: %w", err)}
+		return
 	}
-	return artists, nil
+	ch <- artistsResult{data: artists}
 }
 
-func FetchLocations() (models.LocationsIndex, error) {
-	resp, err := http.Get(LocationURL)
+func fetchLocations(ch chan<- locationResult) {
+	resp, err := http.Get(locationsURL)
 	if err != nil {
-		return models.LocationsIndex{}, err
+		log.Printf("fetchLocations: network error %v", err)
+		ch <- locationResult{nil, fmt.Errorf("fetch locations: %w", err)}
+		return
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return models.LocationsIndex{}, fmt.Errorf("Unexpected status code: %d", resp.StatusCode)
+		log.Printf("fetchLocations: bad status %d", resp.StatusCode)
+		ch <- locationResult{err: fmt.Errorf("fetch locations: status %d", resp.StatusCode)}
+		return
 	}
-	var locations models.LocationsIndex
-	err = json.NewDecoder(resp.Body).Decode(&locations)
-	if err != nil {
-		return models.LocationsIndex{}, err
+
+	var wrapper models.LocationsIndexResp
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		log.Printf("fetchLocations: decode error %v", err)
+		ch <- locationResult{err: fmt.Errorf("decode locations: %w", err)}
+		return
 	}
-	return locations, nil
+	ch <- locationResult{data: wrapper.Index}
 }
 
-func FetchDates() (models.DatesIndex, error) {
-	resp, err := http.Get(DatesURL)
+func fetchDates(ch chan<- datesResult) {
+	resp, err := http.Get(datesURL)
 	if err != nil {
-		return models.DatesIndex{}, err
+		log.Printf("fetchDates: network error %v", err)
+		ch <- datesResult{nil, fmt.Errorf("fetch dates: %w", err)}
+		return
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return models.DatesIndex{}, fmt.Errorf("Unexpected status code: %d", resp.StatusCode)
+		log.Printf("fetchDates: bad status %d", resp.StatusCode)
+		ch <- datesResult{err: fmt.Errorf("fetch dates: status %d", resp.StatusCode)}
+		return
 	}
-	var dates models.DatesIndex
-	err = json.NewDecoder(resp.Body).Decode(&dates)
-	if err != nil {
-		return models.DatesIndex{}, err
+
+	var wrapper models.DatesIndexResp
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		log.Printf("fetchDates: decode error %v", err)
+		ch <- datesResult{err: fmt.Errorf("decode dates: %w", err)}
+		return
 	}
-	return dates, nil
+	ch <- datesResult{data: wrapper.Index}
 }
 
-func FetchRelations() (models.RelationsIndex, error) {
-	resp, err := http.Get(RelationURL)
+func fetchRelations(ch chan<- relationsResult) {
+	resp, err := http.Get(relationsURL)
 	if err != nil {
-		return models.RelationsIndex{}, err
+		log.Printf("fetchRelations: network error %v", err)
+		ch <- relationsResult{nil, fmt.Errorf("fetch relations: %w", err)}
+		return
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return models.RelationsIndex{}, fmt.Errorf("Unexpected status code: %d", resp.StatusCode)
+		log.Printf("fetchRelations: bad status %d", resp.StatusCode)
+		ch <- relationsResult{err: fmt.Errorf("fetch relations: status %d", resp.StatusCode)}
+		return
 	}
-	var relations models.RelationsIndex
-	err = json.NewDecoder(resp.Body).Decode(&relations)
-	if err != nil {
-		return models.RelationsIndex{}, err
+
+	var wrapper models.RelationsIndexResp
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		log.Printf("fetchRelations: decode error %v", err)
+		ch <- relationsResult{err: fmt.Errorf("decode relations: %w", err)}
+		return
 	}
-	return relations, nil
+	ch <- relationsResult{data: wrapper.Index}
 }
 
-func FetchAll() (*RawData, error) {
-	var wg sync.WaitGroup
-	var data RawData
-	errs := make(chan error, 4)
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
-		artists, err := FetchArtists()
-		if err != nil {
-			errs <- err
-			return
-		}
-		data.Artists = artists
-	}()
-	go func() {
-		defer wg.Done()
-		locations, err := FetchLocations()
-		if err != nil {
-			errs <- err
-			return
-		}
-		data.Locations = locations
-	}()
-	go func() {
-		defer wg.Done()
-		dates, err := FetchDates()
-		if err != nil {
-			errs <- err
-			return
-		}
-		data.Dates = dates
-	}()
-	go func() {
-		defer wg.Done()
-		relations, err := FetchRelations()
-		if err != nil {
-			errs <- err
-			return
-		}
-		data.Relations = relations
-	}()
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		return nil, err
+func FetchAll() (RawData, error) {
+	artistsCh := make(chan artistsResult, 1)
+	locationCh := make(chan locationResult, 1)
+	datesCh := make(chan datesResult, 1)
+	relationsCh := make(chan relationsResult, 1)
+
+	go fetchArtists(artistsCh)
+	go fetchLocations(locationCh)
+	go fetchDates(datesCh)
+	go fetchRelations(relationsCh)
+
+	artistsRes := <-artistsCh
+	if artistsRes.err != nil {
+		return RawData{}, artistsRes.err
 	}
-	return &data, nil
+
+	locationRes := <-locationCh
+	if locationRes.err != nil {
+		return RawData{}, locationRes.err
+	}
+
+	datesRes := <-datesCh
+	if datesRes.err != nil {
+		return RawData{}, datesRes.err
+	}
+
+	relationsRes := <-relationsCh
+	if relationsRes.err != nil {
+		return RawData{}, relationsRes.err
+	}
+	return RawData{
+		Artists:   artistsRes.data,
+		Locations: locationRes.data,
+		Dates:     datesRes.data,
+		Relations: relationsRes.data,
+	}, nil
 }

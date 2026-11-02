@@ -1,66 +1,75 @@
 package models
 
-type Artist struct {
+type RawArtist struct {
 	ID           int      `json:"id"`
-	Name         string   `json:"name"`
 	Image        string   `json:"image"`
+	Name         string   `json:"name"`
 	Members      []string `json:"members"`
 	CreationDate int      `json:"creationDate"`
 	FirstAlbum   string   `json:"firstAlbum"`
-	Locations    string   `json:"locations"`
-	ConcertDates string   `json:"concertDates"`
-	Relations    string   `json:"relations"`
+	LocationURL  string   `json:"locations"`
+	DatesURL     string   `json:"concertDates"`
+	RelationsURL string   `json:"relations"`
 }
 
-type LocationsEntry struct {
+type RawLocationResp struct {
 	ID        int      `json:"id"`
 	Locations []string `json:"locations"`
-	Dates     string   `json:"dates"`
+	DatesURL  string   `json:"dates"`
 }
 
-type LocationsIndex struct {
-	Index []LocationsEntry `json:"index"`
+type LocationsIndexResp struct {
+	Index []RawLocationResp `json:"index"`
 }
 
-type DatesEntry struct {
+type RawDatesResp struct {
 	ID    int      `json:"id"`
 	Dates []string `json:"dates"`
 }
 
-type DatesIndex struct {
-	Index []DatesEntry `json:"index"`
+type DatesIndexResp struct {
+	Index []RawDatesResp `json:"index"`
 }
 
-type RelationsEntry struct {
+type RawRelationsResp struct {
 	ID             int                 `json:"id"`
 	DatesLocations map[string][]string `json:"datesLocations"`
 }
 
-type RelationsIndex struct {
-	Index []RelationsEntry `json:"index"`
+type RelationsIndexResp struct {
+	Index []RawRelationsResp `json:"index"`
 }
 
-type Coordinate struct {
-	Lat         float64
-	Lng         float64
-	City        string
-	State       string
-	Country     string
-	OriginalKey string
-	Resolved    bool
+type ConcertLocation struct {
+	Location string
+	Dates    []string
 }
 
-type Suggestion struct {
-	Text     string `json:"text"`
+type Artist struct {
+	ID               int
+	Name             string
+	Image            string
+	Members          []string
+	CreationDate     int
+	FirstAlbum       string
+	Locations        []string
+	Dates            []string
+	ConcertLocations []ConcertLocation
+}
+
+type GeoResult struct {
+	Location string  `json:"location"`
+	Lat      float64 `json:"lat"`
+	Lng      float64 `json:"lng"`
+	City     string  `json:"city"`
+	State    string  `json:"state"`
+	Country  string  `json:"country"`
+	Resolved bool    `json:"resolved"`
+}
+
+type SearchEntry struct {
+	Value    string `json:"value"`
 	Type     string `json:"type"`
 	Context  string `json:"context"`
 	ArtistID int    `json:"artist_id"`
-}
-
-type ArtistView struct {
-	Artist
-	ResolvedLocations []string
-	ResolvedDates     []string
-	DatesLocations    map[string][]string
-	Coordinates       []Coordinate
 }

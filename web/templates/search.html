@@ -1,0 +1,26 @@
+{{define "title"}}Search · Groupie Tracker{{end}}
+
+{{define "content"}}
+<h1 class="page-title">Search</h1>
+
+{{if .Searched}}
+  <p class="count" role="status">{{len .Results}} {{if eq (len .Results) 1}}result{{else}}results{{end}} for &ldquo;{{.Query}}&rdquo;</p>
+  {{if .Results}}
+  <ul class="result-list">
+    {{range .Results}}
+    <li>
+      <a href="/artist/{{.ArtistID}}">
+        <span class="badge">{{.Type}}</span>
+        <strong>{{.Value}}</strong>
+        {{if .Context}}<span class="muted">{{.Context}}</span>{{end}}
+      </a>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="empty">Nothing matches &ldquo;{{.Query}}&rdquo;. Try fewer letters, or search by artist, member, location or year.</p>
+  {{end}}
+{{else}}
+  <p class="muted">Type an artist, a member, a location or a date in the search bar above.</p>
+{{end}}
+{{end}}

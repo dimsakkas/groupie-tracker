@@ -1,253 +1,114 @@
-# Groupie Tracker
+📖 Overview
 
-A Go web application that turns the Groupie Trackers REST API (bands, concert
-locations, dates and their relations) into a searchable, filterable website
-with an interactive concert map. Built for the Zone01 curriculum as the
-fully-featured version: the core subject plus all four optional subjects
-(search bar, geolocalization, filters, visualizations).
+Groupie Tracker is a Go web application that showcases data about music artists and bands — members, formation year, first album, and their concert history on an interactive map.
 
-<!-- screenshot
+The app consumes the Groupie Trackers API for artist data and the Nominatim (OpenStreetMap) API for geocoding concert locations. It has no frontend framework or build step — server-rendered HTML with vanilla JavaScript for live interactivity.
 
----
+A Zone01 Athens project.
 
-## Description
+Live demo: https://groupie-tracker-p7gn.onrender.com
 
-The server plays both roles of the client-server model. At startup it is a
-**REST client**: it fetches the four API endpoints in parallel, joins them into
-one unified artist model and keeps everything in memory. At runtime it is a
-**REST server**: it renders HTML pages and answers small JSON requests that the
-browser's JavaScript makes while the user types, filters or opens a map.
+🚀 Getting Started
 
-The backend uses the Go standard library only (`go.mod` has no `require`).
-The one external dependency is [Leaflet](https://leafletjs.com) in the browser,
-loaded from a CDN only when a map is shown.
-
----
-
-## Features
-
-**Core**
-- Artist cards with image, name, creation year and number of members
-- Artist page: members, first album, every concert location with its dates
-  (oldest first)
-- Custom 400, 404 and 500 pages that share the site layout; a panic in any
-  handler becomes a 500 page and the server keeps running
-
-**Search bar**
-- Live suggestions while typing (debounced 250 ms), each one labeled by type:
-  artist, member, location, creation year, first album date
-- Case-insensitive, prefix based, backed by a trie; multi-word queries work
-  (`billie joe`, `london-uk`, `05-08-1967`)
-- Keyboard: `/` focuses the box, arrows move, Enter opens, Esc closes
-- The search form is a plain `GET /search`, so full results also work without
-  JavaScript
-
-**Filters** (results update while you change them, without a page reload)
-- Range: creation year, first album year
-- Checkbox: number of members, concert locations grouped by country
-  (ticking a country selects all its cities)
-- Filters combine with AND; several selected locations combine with OR
-- The filters live in the URL, so the back button restores them; "Clear all"
-  resets everything
-
-**Geolocalization**
-- Leaflet map with OpenStreetMap tiles and attribution
-- Numbered markers in chronological order, joined by a polyline (the tour path)
-- Locations are geocoded with Nominatim in the background, so the server is
-  available immediately; the map shows a message and retries until the
-  coordinates are ready
-
-**Visualizations**
-- Consistent palette, spacing and typography; text/background pairs meet
-  WCAG AA contrast (checked with axe-core)
-- Responsive from 320 px to 1440 px and wider
-- Shneiderman's rules: consistent layout, a `/` shortcut, loading indicators,
-  reversible actions (clear filters, back button)
-
-**Extras**
-- **Tour distance**: total kilometres of the tour (haversine, straight lines)
-- **Play tour**: an animated marker travels along the tour in order
-  (respects `prefers-reduced-motion`)
-- **Favorites**: a heart button on every card, saved in the browser, with a
-  "favorites only" filter
-- **World map**: every concert location of the artists that pass the current
-  filters
-- **Compare**: two artists side by side (`/compare`)
-
----
-
-## Requirements
-
-- Go 1.24 or later (routes use the Go 1.22+ `GET /{id}` patterns)
-- An internet connection for the first start (the API, Nominatim, map tiles)
-- No external Go dependencies, standard library only
-
----
-
-## Installation & Usage
-
-```bash
-git clone https://platform.zone01.gr/git/dsakkas/groupie-tracker.git
-cd groupie-tracker
+You need Go 1.25 or later. From the project root:
 
 go run ./cmd/server
-```
 
-Run it from the repository root, because it reads `web/` and `data/` with
-relative paths. Then open `http://localhost:8080`. Set the `PORT` environment
-variable to use another port, for example `PORT=9090 go run ./cmd/server`.
+Then open http://localhost:8080. The server also respects the PORT environment variable, which hosting platforms such as Render set automatically. Stop the server with Ctrl+C.
 
-**First start:** the pages work at once, but geocoding the ~190 distinct
-locations takes a few minutes (Nominatim allows one request per second). Until
-it finishes, maps show "Looking up concert locations…" and keep checking. The
-results are saved in `data/geocache.json`, so every later start has its
-coordinates immediately.
+The first startup geocodes every concert location through Nominatim, rate-limited to 1 request/second; this can take a few minutes the first time. A disk cache (data/geocache.json) makes every later startup near-instant.
 
----
+✨ Features
 
-## How It Works
+Browse all artists in a responsive card grid, with image, formation year, and member count.
+Filter live, with no page reload: formation year range, first album year range, number of members, and concert location as a three-level Country → State/Region → City tree.
+Search live across artists, members, locations, and dates, with a suggestions dropdown as you type and a dedicated full-results search page.
+Open an artist page for full details, members, chronological concert history, and a tour map.
+Compare two artists side by side: location count, total shows, and tour distance in kilometres.
+View a world map of every geocoded concert location across all artists at once.
+Save favorites locally in the browser.
+Fall back to a saved snapshot of the API data if the live Groupie Trackers API is unreachable at startup.
+🧭 Using the App
 
-1. **Fetch** — four goroutines call `/artists`, `/locations`, `/dates` and
-   `/relation` in parallel. A successful fetch is also saved to
-   `data/upstream.json`; if the API cannot be reached at boot, that saved copy
-   is used instead. With neither, the server exits with a clear error.
-2. **Store** — the four payloads are joined into one `Artist` per band and put
-   in lookup maps. After this step the store is only read, so handlers need no
-   locks for the artist data.
-3. **Search index** — a trie built once. Every word of every name, member,
-   location and date is a key, so `japan` finds `saitama-japan`.
-4. **Geocoding** (background) — a worker pool resolves each unique location with
-   Nominatim, gated by a shared 1 request/second limiter, one retry after 2 s,
-   then the location is skipped (one missing marker, never a crash). Results are
-   written atomically to `data/geocache.json`; a corrupted cache is deleted and
-   rebuilt. The only shared mutable state, the geocoded coordinates, sits behind
-   a `sync.RWMutex`.
-5. **Serve** — handlers read from memory and render a template or JSON.
-   Pages are rendered into a buffer first, so a template error can never send a
-   half-written page.
+Browse the artist grid on the home page, or use the filters panel to narrow it down.
+Use the search bar in the header for live suggestions, or press Enter / select Search for full results.
+Select an artist card to open its page, with members, concert history, and tour map.
+From an artist page, select "Compare with" to see it side by side with another artist.
+Select "Show world map" on the home page to see every concert location at once.
+Select the heart icon on any card to save it as a favorite.
+🔄 Application Flow
 
----
+cmd/server/main.go orchestrates startup: fetch data, build the in-memory store and search index, start the HTTP server, then geocode locations in the background.
+internal/fetch fetches artists, locations, dates, and relations from the API in parallel, and keeps a snapshot on disk as a fallback for when the live API is down.
+internal/store combines the raw data into one view per artist and answers filter queries.
+internal/search indexes artist names, members, locations, and dates in a prefix-search trie for live suggestions.
+internal/geocode resolves each unique concert location to coordinates via Nominatim, through a worker pool with a shared rate limiter and a disk cache.
+internal/handlers serves the HTML pages and the JSON API, reading from the store and the search index — never calling either external API directly.
+The frontend (web/static/js) talks to the JSON API for live filtering, search suggestions, favorites, and the maps (rendered with Leaflet).
+📁 Project Structure
 
-## HTTP API
+groupie-tracker/
+├── cmd/
+│   └── server/              # main.go: startup and wiring
+├── internal/
+│   ├── fetch/                # Groupie Trackers API client, snapshot fallback
+│   ├── store/                 # combined per-artist data, filters
+│   ├── search/                 # prefix-search trie
+│   ├── geocode/                 # Nominatim client, worker pool, disk cache
+│   ├── handlers/                 # HTTP routes, templates, JSON API
+│   └── models/                    # shared data types
+├── web/
+│   ├── templates/             # HTML pages (html/template)
+│   └── static/
+│       ├── css/
+│       └── js/
+├── data/
+│   ├── upstream.json          # backup copy of the API data
+│   └── geocache.json           # cache of geocoded coordinates
+├── docs/
+│   ├── PRD.md                  # requirements and architecture decisions
+│   └── TASK_CARDS.md            # task breakdown
+└── README.md
+🛠 Technical Details
 
-Every route is `GET`; the application is read-only.
+Language: Go 1.25, standard library only (net/http, html/template)
+Data sources: Groupie Trackers API (artists, locations, dates, relations) and Nominatim / OpenStreetMap (geocoding)
+Concurrency: the four API endpoints are fetched in parallel; geocoding runs through a worker pool with a shared rate limiter (1 request/second, as required by Nominatim's usage policy)
+Resilience: a disk snapshot (data/upstream.json) is used if the live API is unreachable or returns no artists at startup; a disk cache (data/geocache.json) avoids re-geocoding on every startup
+Frontend: vanilla JavaScript, no framework or build step; Leaflet for maps; favorites stored in localStorage
+Tests: every external dependency (both APIs) is replaced with mock HTTP servers, so the test suite needs no internet connection
 
-**Pages**
-
-| Route | Description | Success | Error |
-|-------|-------------|---------|-------|
-| `/` | Home: cards, filters, world map | 200 | 500 |
-| `/artist/{id}` | Artist page with members, concerts, map | 200 | 400 (bad id) / 404 / 500 |
-| `/search?q=...` | Full-page search results | 200 | 500 |
-| `/compare?a=ID&b=ID` | Two artists side by side | 200 | 400 / 404 / 500 |
-| `/static/*` | CSS and JavaScript | 200 | 404 |
-| anything else | Custom 404 page | — | 404 |
-
-**JSON** (errors are JSON too: `{"error": "..."}`)
+HTTP API
 
 | Route | Description |
-|-------|-------------|
-| `/api/suggest?q=...` | Up to 10 typed suggestions: `[{"value","type","context","artist_id"}]` |
-| `/api/filter?...` | `{"artist_ids":[...],"total":N}` |
-| `/api/artist/{id}/geo` | `{"ready":bool,"coordinates":[...],"distance_km":N}`, chronological |
-| `/api/geo` | `{"ready":bool,"locations":[...]}` with the artists at each location |
-
-`/api/filter` parameters: `creation_min`, `creation_max`, `first_album_min`,
-`first_album_max` (whole numbers), `members=3,5` (comma separated) and a
-repeatable `location` (for example `?location=texas-usa&location=georgia-usa`).
-A missing parameter means "no filter"; a malformed one returns 400.
-
----
-
-## Error Handling
-
-| Code | When it happens |
-|------|-----------------|
-| 400 | Malformed artist id, malformed compare id, malformed filter parameter |
-| 404 | Unknown artist, unknown route |
-| 500 | Template failure, or a panic recovered by the middleware |
-
-Failures of outside services never stop the server once it is running: a failed
-geocode drops one marker, an unavailable map library leaves the concert list
-readable, and a failed suggestion request leaves the form working.
-
----
-
-## Testing
-
-```bash
-gofmt -l .                   # prints nothing when the code is formatted
-go vet ./...
-go test -race -cover ./...
-```
-
-Tests use `httptest` fake servers, so they need no network (a fake Nominatim, a
-fake API, the real templates). `main.go` is intentionally untested: it only
-wires the packages together.
-
----
-
-## Project Structure
-
-```
-cmd/server/main.go          boot sequence and routes, no business logic
-internal/
-  fetch/                    concurrent API client + saved snapshot (upstream.json)
-  models/                   shared structs
-  store/                    combined dataset, lookup maps, filters, tour distance
-  search/                   trie index and suggestion lookup
-  geocode/                  Nominatim client, worker pool, rate limiter, disk cache
-  handlers/                 page handlers, JSON API, error pages, panic recovery
-web/
-  templates/                layout + one template per page, 400/404/500
-  static/css/               style.css, responsive.css
-  static/js/                search, filters, favorites, map, worldmap
-data/                       geocache.json and upstream.json, generated at runtime
-```
-
----
-
-## Design Notes
-
-- **Fetch once, serve from memory.** The API is called at boot only; every
-  request after that reads memory.
-- **Geocoding is Nominatim only.** An earlier idea resolved locations from their
-  text first (`texas-usa` is already a state), but it covered only 27 of 189
-  locations, so it was dropped. Filters work on the raw location strings and do
-  not depend on geocoding at all.
-- **Nominatim request format.** The query parameters are sent as
-  `format, limit, addressdetails, accept-language`. With another order,
-  Nominatim answered with empty results for many locations; keep the order as
-  it is.
-- **Disk files are optimizations.** `data/geocache.json` can be deleted at any
-  time; `data/upstream.json` only matters when the API is down.
-
----
-
-## Known Limitations
-
-- The server depends on the Groupie Trackers API at the first start. If the API
-  is unreachable and there is no saved `data/upstream.json`, it cannot start.
-- Artist images are served by the API host, so they do not load when that host
-  is down.
-- A few locations cannot be found by Nominatim (for example
-  `willemstad-netherlands_antilles`, a country that no longer exists); they have
-  no marker but still work in search and filters.
-- Tour distance and the tour path are straight lines between locations, not
-  routes.
-
----
-
-## Authors
-
-| Zone01 login | Responsibility |
 |---|---|
-| **dsakkas** | Data models · `fetch` · `geocode` · `store` · `search` packages |
-| **npanagopoul** | HTTP server and routing · page handlers · JSON API handlers · error handlers and panic recovery |
-| **dpavaloa** | HTML templates · CSS · JavaScript (autocomplete, live filtering, map and polyline) |
+| GET / | Home page, artist list |
+| GET /artist/{id} | A single artist's page |
+| GET /search?q= | Full search results |
+| GET /compare?a=ID&b=ID | Compare two artists |
+| GET /api/suggest?q= | JSON, live search suggestions |
+| GET /api/filter?... | JSON, IDs of the artists matching the filters |
+| GET /api/artist/{id}/geo | JSON, geocoded locations for one artist |
+| GET /api/geo | JSON, all geocoded locations combined |
 
-Tests and this README were written by the whole team.
+✅ Tests
 
-## License
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
 
-Built as part of the [Zone01](https://zone01.gr) curriculum.
+The app depends on the Groupie Trackers API and on Nominatim for anything beyond what is already cached, so the data shown — and how long the first geocoding pass takes — can vary with their availability.
+
+📚 Project Documentation
+
+Product requirements: docs/PRD.md
+Task breakdown: docs/TASK_CARDS.md
+
+Deploy
+
+Runs on Render, free tier. Build command: go build -o server ./cmd/server. Start command: ./server. The free tier spins the server down after 15 minutes of inactivity (next request: ~30–60 second cold start); because its disk is ephemeral, data/upstream.json and the already-populated data/geocache.json stay committed to the repo so every redeploy starts ready to go.
+
+Team
+
+Zone01 Athens — dsakkas, npanagopoul, dpavaloa

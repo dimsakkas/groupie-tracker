@@ -20,9 +20,14 @@ import (
 // paths web/ and data/ resolve correctly.
 func main() {
 	// 1. Fetch everything once; without the core data there is nothing to serve.
-	data, err := fetch.FetchAll()
+	// Every successful fetch is saved to data/upstream.json; if the API is down
+	// at boot, that copy from the last good run is used instead.
+	data, fromSnapshot, err := fetch.FetchWithSnapshot(filepath.Join("data", "upstream.json"))
 	if err != nil {
 		log.Fatalf("boot failed: %v", err)
+	}
+	if fromSnapshot {
+		log.Printf("WARNING: the API is unreachable, running on the saved snapshot (images may not load)")
 	}
 	log.Printf("fetched %d artists, %d location entries, %d date entries, %d relation entries",
 		len(data.Artists), len(data.Locations), len(data.Dates), len(data.Relations))
@@ -51,8 +56,12 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 	mux.HandleFunc("GET /{$}", srv.HomeHandler)
+	mux.HandleFunc("GET /artist/{id}", srv.ArtistHandler)
+	mux.HandleFunc("GET /search", srv.SearchHandler)
+	mux.HandleFunc("GET /compare", srv.CompareHandler)
 	mux.HandleFunc("GET /api/suggest", srv.SuggestHandler)
 	mux.HandleFunc("GET /api/filter", srv.FilterHandler)
+	mux.HandleFunc("GET /api/geo", srv.WorldGeoHandler)
 	mux.HandleFunc("GET /api/artist/{id}/geo", srv.GeoHandler)
 	mux.HandleFunc("/", handlers.NotFound) // catch-all: every unknown path
 

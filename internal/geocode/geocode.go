@@ -40,9 +40,11 @@ var (
 
 const UserAgent = "groupie-tracker-zone01-project/1.0"
 
-// Geocode turns a location string like "north_carolina-usa" into
-// coordinates by asking Nominatim.
-func Geocode(location string) (models.GeoResult, error) {
+// callNominatim sends exactly ONE query to Nominatim for the given search
+// string and returns the result, or an error if nothing was found. It does
+// not know about the "city-country" convention of our location keys — that
+// decision belongs to Geocode, which calls this once or twice.
+func callNominatim(location string) (models.GeoResult, error) {
 	// 1. "north_carolina-usa" -> "north carolina, usa"
 	query := strings.ReplaceAll(location, "_", " ")
 	query = strings.ReplaceAll(query, "-", ", ")
@@ -109,4 +111,33 @@ func Geocode(location string) (models.GeoResult, error) {
 		Country:  first.Address.Country,
 		Resolved: true,
 	}, nil
+}
+
+// Geocode turns a location string like "north_carolina-usa" into
+// coordinates. It first asks for the full string; if that fails, it falls
+// back to the city alone, split on the last "-". This matters for places
+// whose "country" suffix no longer exists as a political entity — for
+// example "willemstad-netherlands_antilles" (Netherlands Antilles was
+// dissolved in 2010): Nominatim finds nothing for the full string, but
+// does find "willemstad" on its own. Without this fallback that one
+// location is permanently unresolved on every run.
+func Geocode(location string) (models.GeoResult, error) {
+	result, err := callNominatim(location)
+	if err == nil {
+		return result, nil
+	}
+
+	city := strings.Split(location, "-")[0]
+	if city == location {
+		// no "-" to split on: there is nothing left to fall back to
+		return models.GeoResult{}, err
+	}
+
+	result, fallbackErr := callNominatim(city)
+	if fallbackErr != nil {
+		return models.GeoResult{}, fallbackErr
+	}
+	// The map lookup elsewhere uses the ORIGINAL key, not the city alone.
+	result.Location = location
+	return result, nil
 }

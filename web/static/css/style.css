@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Unbounded:wght@600;700;800&display=swap');
 /* ==========================================================================
    Groupie Tracker - base styles (mobile first).
    Wider screens are handled in responsive.css.
@@ -5,17 +6,17 @@
    ========================================================================== */
 
 :root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --text: #1a1a1a;
-  --muted: #4a4f57;
-  --accent: #0b5cad;
-  --accent-hover: #084a8c;
-  --accent-soft: #e3edf8;
-  --header: #111827;
-  --border: #c9ced6;
-  --danger: #b42318;
-  --focus: #f59e0b;
+  --bg: #0D0D10;
+  --surface: #141418;
+  --text: #F2EFE9;
+  --muted: #A3A1AD;
+  --accent: #FF5A36;
+  --accent-hover: #E04A28;
+  --accent-soft: #2A1812;
+  --header: #0D0D10;
+  --border: #26262E;
+  --danger: #FF6B5E;
+  --focus: #FF5A36;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -29,13 +30,13 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
 }
 
-h1, h2, h3 { line-height: 1.25; }
+h1, h2, h3 { line-height: 1.25; font-family: 'Unbounded', 'DM Sans', sans-serif; }
 img { max-width: 100%; }
 a { color: var(--accent); }
 a:hover { color: var(--accent-hover); }
@@ -170,8 +171,8 @@ input::placeholder { color: #5b6470; opacity: 1; }
 .btn-secondary { background: var(--surface); color: var(--accent); }
 .btn-secondary:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-hover); border-color: var(--accent-hover); }
 
-.btn-light { background: #ffffff; color: var(--header); border-color: #ffffff; }
-.btn-light:hover:not(:disabled) { background: #e5e7eb; color: var(--header); border-color: #e5e7eb; }
+.btn-light { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+.btn-light:hover:not(:disabled) { background: var(--accent-hover); color: #ffffff; border-color: var(--accent-hover); }
 
 .badge {
   display: inline-block;
@@ -180,7 +181,7 @@ input::placeholder { color: #5b6470; opacity: 1; }
   font-size: 0.8rem;
   font-weight: 600;
   text-align: center;
-  color: #0b3d73;
+  color: var(--accent);
   background: var(--accent-soft);
   border-radius: 999px;
 }
@@ -238,6 +239,8 @@ legend output { font-weight: 400; color: var(--muted); }
   margin-bottom: var(--space-2);
   padding: 0.5rem 0.7rem;
   font: inherit;
+  background: var(--surface);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -252,6 +255,15 @@ legend output { font-weight: 400; color: var(--muted); }
 .country summary:hover { background: var(--accent-soft); }
 .country ul { list-style: none; margin: 0; padding: 0 0.6rem 0.5rem 0.2rem; }
 .country li label { display: flex; align-items: center; gap: var(--space-2); padding: 0.15rem 0; }
+.state { display: flex; align-items: flex-start; gap: var(--space-2); padding-left: 1.4rem; margin-top: 0.2rem; }
+.state-box { margin-top: 0.7rem; }
+.state details { flex: 1; min-width: 0; }
+.state summary { padding: 0.4rem 0.6rem 0.4rem 0; cursor: pointer; }
+.state summary:hover { background: var(--accent-soft); }
+.state ul { list-style: none; margin: 0; padding: 0 0.6rem 0.5rem 0.2rem; }
+.state li label { display: flex; align-items: center; gap: var(--space-2); padding: 0.15rem 0; }
+.unstated-cities { list-style: none; margin: 0; padding: 0 0.6rem 0.5rem 1.4rem; }
+.unstated-cities li label { display: flex; align-items: center; gap: var(--space-2); padding: 0.15rem 0; }
 .check { display: flex; align-items: center; gap: var(--space-2); }
 
 /* ---------- results ---------- */
@@ -297,7 +309,7 @@ legend output { font-weight: 400; color: var(--muted); }
 }
 .card a { display: block; color: inherit; text-decoration: none; height: 100%; }
 .card a:hover { background: var(--accent-soft); }
-.card img { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; background: #e5e7eb; }
+.card img { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; background: var(--surface); }
 .card h2 { margin: 0.75rem 0.9rem 0.25rem; font-size: 1.05rem; }
 .card p { margin: 0 0.9rem 0.9rem; color: var(--muted); font-size: 0.9rem; }
 
@@ -327,7 +339,7 @@ legend output { font-weight: 400; color: var(--muted); }
 .map {
   width: 100%;
   height: 22rem;
-  background: #dfe5ec;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   z-index: 0;
@@ -363,7 +375,7 @@ legend output { font-weight: 400; color: var(--muted); }
 
 .back { margin: 0 0 var(--space-2); }
 .artist-head { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); }
-.artist-img { width: 100%; max-width: 300px; height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); background: #e5e7eb; }
+.artist-img { width: 100%; max-width: 300px; height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
 .title-row { display: flex; align-items: center; gap: var(--space-3); }
 .title-row h1 { margin: 0; }
 

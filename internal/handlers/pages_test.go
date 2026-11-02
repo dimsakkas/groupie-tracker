@@ -89,7 +89,11 @@ func TestPrettyLocation(t *testing.T) {
 }
 
 func TestLocationGroups(t *testing.T) {
-	groups := locationGroups([]string{"london-uk", "texas-usa", "georgia-usa", "singapore"})
+	states := map[string]string{
+		"texas-usa":   "texas",
+		"georgia-usa": "georgia",
+	}
+	groups := locationGroups([]string{"london-uk", "texas-usa", "georgia-usa", "singapore"}, states)
 
 	if len(groups) != 3 {
 		t.Fatalf("got %d groups, want 3: %+v", len(groups), groups)
@@ -97,9 +101,24 @@ func TestLocationGroups(t *testing.T) {
 	if groups[0].Name != "Singapore" || groups[1].Name != "UK" || groups[2].Name != "USA" {
 		t.Errorf("groups not sorted by name: %+v", groups)
 	}
+
 	usa := groups[2]
-	if len(usa.Cities) != 2 || usa.Cities[0].Label != "Georgia" || usa.Cities[0].Value != "georgia-usa" {
-		t.Errorf("USA cities wrong or unsorted: %+v", usa.Cities)
+	if len(usa.States) != 2 {
+		t.Fatalf("USA should have 2 states (Georgia, Texas), got %d: %+v", len(usa.States), usa.States)
+	}
+	if usa.States[0].Name != "Georgia" || usa.States[1].Name != "Texas" {
+		t.Errorf("USA states not sorted by name: %+v", usa.States)
+	}
+	if len(usa.States[0].Cities) != 1 || usa.States[0].Cities[0].Label != "Georgia" || usa.States[0].Cities[0].Value != "georgia-usa" {
+		t.Errorf("Georgia state's city wrong: %+v", usa.States[0])
+	}
+
+	singapore := groups[0]
+	if len(singapore.States) != 1 || singapore.States[0].Name != "" {
+		t.Errorf("Singapore (no geocoded state) should have one unnamed state group: %+v", singapore.States)
+	}
+	if len(singapore.States[0].Cities) != 1 || singapore.States[0].Cities[0].Label != "Singapore" {
+		t.Errorf("Singapore city wrong: %+v", singapore.States[0].Cities)
 	}
 }
 

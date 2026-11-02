@@ -32,6 +32,7 @@
   };
   var locationBoxes = Array.prototype.slice.call(form.querySelectorAll('input[name="location"]'));
   var countryBoxes = Array.prototype.slice.call(form.querySelectorAll('.country-box'));
+  var stateBoxes = Array.prototype.slice.call(form.querySelectorAll('.state-box'));
   var memberBoxes = Array.prototype.slice.call(form.querySelectorAll('input[name="members"]'));
 
   function el(id) { return document.getElementById(id); }
@@ -110,6 +111,15 @@
 
   function syncCountryBoxes() {
     countryBoxes.forEach(function (box) {
+      var cities = box.parentElement.querySelectorAll('input[name="location"]');
+      var checked = Array.prototype.filter.call(cities, function (c) { return c.checked; }).length;
+      box.checked = checked === cities.length && cities.length > 0;
+      box.indeterminate = checked > 0 && checked < cities.length;
+    });
+  }
+
+  function syncStateBoxes() {
+    stateBoxes.forEach(function (box) {
       var cities = box.parentElement.querySelectorAll('input[name="location"]');
       var checked = Array.prototype.filter.call(cities, function (c) { return c.checked; }).length;
       box.checked = checked === cities.length && cities.length > 0;
@@ -218,12 +228,13 @@
   form.addEventListener('change', function (e) {
     var t = e.target;
     if (t === favOnly || t === locSearch) return;
-    if (t.classList.contains('country-box')) {
+    if (t.classList.contains('country-box') || t.classList.contains('state-box')) {
       t.parentElement.querySelectorAll('input[name="location"]').forEach(function (c) {
         if (!c.closest('li').hidden) c.checked = t.checked;
       });
     }
     syncCountryBoxes();
+    syncStateBoxes();
     scheduleRefresh();
   });
 

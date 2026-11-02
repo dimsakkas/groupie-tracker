@@ -17,12 +17,13 @@ import (
 // geo/ready are written later by the background geocoding, so
 // they are protected by mu.
 type Store struct {
-	Artists     []models.Artist // sorted by ID: stable order
+	Artists     []models.Artist
 	ArtistsByID map[int]models.Artist
 
-	mu    sync.RWMutex
-	geo   map[string]models.GeoResult
-	ready bool
+	mu             sync.RWMutex
+	geo            map[string]models.GeoResult
+	locationStates map[string]string // raw location -> geocoded State (lowercased), for filtering
+	ready          bool
 }
 
 type FilterParams struct {
@@ -110,7 +111,9 @@ func BuildArtists(raw fetch.RawData) []models.Artist {
 func (s *Store) Filter(p FilterParams) []int {
 	wanted := normalizeTerms(p.Locations)
 	ids := []int{}
-
+	s.mu.RLock()
+	locationStates := s.locationStates
+	s.mu.RUnlock()
 	for _, artist := range s.Artists {
 		if p.CreationMin != 0 && artist.CreationDate < p.CreationMin {
 			continue
@@ -136,7 +139,7 @@ func (s *Store) Filter(p FilterParams) []int {
 			continue
 		}
 
-		if len(wanted) > 0 && !matchesAnyLocation(artist.Locations, wanted) {
+		if len(wanted) > 0 && !matchesAnyLocation(artist.Locations, wanted, locationStates) {
 			continue
 		}
 
@@ -180,11 +183,20 @@ func normalizeTerms(terms []string) []string {
 	return out
 }
 
-func matchesAnyLocation(locations []string, wanted []string) bool {
+// matchesAnyLocation reports whether at least one of the artist's locations
+// matches one of the wanted terms — either because the term appears in the
+// normalized raw string itself ("houston" matches "houston-usa"), or
+// because the term equals the location's geocoded state ("texas" matches
+// "houston-usa" once we know Houston is in Texas).
+func matchesAnyLocation(locations []string, wanted []string, locationStates map[string]string) bool {
 	for _, loc := range locations {
 		n := normalize(loc)
+		state := locationStates[loc] // already lowercased in SetGeo; "" if not geocoded yet
 		for _, w := range wanted {
 			if strings.Contains(n, w) {
+				return true
+			}
+			if state != "" && state == w {
 				return true
 			}
 		}
@@ -203,12 +215,30 @@ func (s *Store) UniqueLocations() []string {
 	return slices.Sorted(maps.Keys(unique))
 }
 
+// LocationStates returns a snapshot of the raw-location-to-state lookup,
+// taken under a single lock so the caller sees one consistent view instead
+// of 189 independently-locked reads that could straddle a SetGeo update.
+func (s *Store) LocationStates() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.locationStates
+}
+
 // SetGeo is called once, when geocoding finishes. The caller must not
 // modify the map after the call.
 func (s *Store) SetGeo(results map[string]models.GeoResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.geo = results
+
+	states := make(map[string]string, len(results))
+	for raw, r := range results {
+		if r.State != "" {
+			states[raw] = strings.ToLower(r.State)
+		}
+	}
+	s.locationStates = states
+
 	s.ready = true
 }
 

@@ -60,16 +60,32 @@
         <label class="visually-hidden" for="loc-search">Find a country or city</label>
         <input type="search" id="loc-search" class="loc-search" placeholder="Find a country or city" autocomplete="off">
         <div class="country-list" id="country-list">
-          {{range .Filters.Countries}}
+                   {{range .Filters.Countries}}
           <div class="country">
             <input type="checkbox" class="country-box" aria-label="All locations in {{.Name}}">
             <details>
-              <summary><span class="country-name">{{.Name}}</span> <span class="muted">({{len .Cities}})</span></summary>
-              <ul>
+              <summary><span class="country-name">{{.Name}}</span> <span class="muted">({{len .States}} {{if eq (len .States) 1}}region{{else}}regions{{end}})</span></summary>
+              {{range .States}}
+              {{if .Name}}
+              <div class="state">
+                <input type="checkbox" class="state-box" aria-label="All locations in {{.Name}}">
+                <details>
+                  <summary><span class="state-name">{{.Name}}</span> <span class="muted">({{len .Cities}})</span></summary>
+                  <ul>
+                    {{range .Cities}}
+                    <li><label><input type="checkbox" name="location" value="{{.Value}}"> <span class="city-name">{{.Label}}</span></label></li>
+                    {{end}}
+                  </ul>
+                </details>
+              </div>
+              {{else}}
+              <ul class="unstated-cities">
                 {{range .Cities}}
                 <li><label><input type="checkbox" name="location" value="{{.Value}}"> <span class="city-name">{{.Label}}</span></label></li>
                 {{end}}
               </ul>
+              {{end}}
+              {{end}}
             </details>
           </div>
           {{end}}

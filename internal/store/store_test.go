@@ -190,3 +190,26 @@ func TestGeoFor_ConcurrentReadsWhileSetGeo(t *testing.T) {
 	s.SetGeo(geoResults())
 	wg.Wait()
 }
+
+func TestFilter_LocationMatchesByGeocodedState(t *testing.T) {
+	artists := []models.Artist{
+		{ID: 1, Name: "Plays in Houston", Locations: []string{"houston-usa"}},
+		{ID: 2, Name: "Plays in Dallas", Locations: []string{"dallas-usa"}},
+		{ID: 3, Name: "Plays in Tokyo", Locations: []string{"tokyo-japan"}},
+	}
+	s := newStore(artists)
+	s.SetGeo(map[string]models.GeoResult{
+		"houston-usa": {State: "Texas"},
+		"dallas-usa":  {State: "Texas"},
+		"tokyo-japan": {State: ""}, // Japan has no state in this example
+	})
+
+	ids := s.Filter(FilterParams{Locations: []string{"texas"}})
+
+	if len(ids) != 2 || !slices.Contains(ids, 1) || !slices.Contains(ids, 2) {
+		t.Errorf("expected artists 1 and 2 (Texas cities), got %v", ids)
+	}
+	if slices.Contains(ids, 3) {
+		t.Errorf("expected artist 3 (Tokyo) to be excluded, got %v", ids)
+	}
+}

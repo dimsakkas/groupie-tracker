@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	artistsURL   = "https://groupietrackers.herokuapp.com/api/artists"
-	locationsURL = "https://groupietrackers.herokuapp.com/api/locations"
-	datesURL     = "https://groupietrackers.herokuapp.com/api/dates"
-	relationsURL = "https://groupietrackers.herokuapp.com/api/relation"
+	artistsURL   = "https://groupietrackers.01edu.ai/api/artists"
+	locationsURL = "https://groupietrackers.01edu.ai/api/locations"
+	datesURL     = "https://groupietrackers.01edu.ai/api/dates"
+	relationsURL = "https://groupietrackers.01edu.ai/api/relation"
 )
 
 type artistsResult struct {

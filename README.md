@@ -46,7 +46,7 @@ internal/geocode resolves each unique concert location to coordinates via Nomina
 internal/handlers serves the HTML pages and the JSON API, reading from the store and the search index — never calling either external API directly.
 The frontend (web/static/js) talks to the JSON API for live filtering, search suggestions, favorites, and the maps (rendered with Leaflet).
 📁 Project Structure
-
+```
 groupie-tracker/
 ├── cmd/
 │   └── server/              # main.go: startup and wiring
@@ -69,6 +69,7 @@ groupie-tracker/
 │   ├── PRD.md                  # requirements and architecture decisions
 │   └── TASK_CARDS.md            # task breakdown
 └── README.md
+```
 🛠 Technical Details
 
 Language: Go 1.25, standard library only (net/http, html/template)

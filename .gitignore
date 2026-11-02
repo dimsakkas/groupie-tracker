@@ -1,16 +1,24 @@
-#Compiled binary 
+# Compiled binary
 groupie-tracker
+server
+*.exe
 
-# OS files 
+# OS files
 .DS_Store
 Thumbs.db
 
-#Editor folders 
+# Editor folders
 .vscode/
 .idea/
+*.swp
 
-#Logs
+# Logs
 *.log
 
-# Local geocode cache 
+# Local geocode cache
 data/geocache.json
+data/geocache.json.tmp
+
+# Environment variables
+.env
+.env.local

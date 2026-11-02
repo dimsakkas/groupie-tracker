@@ -1,0 +1,76 @@
+{{define "title"}}Compare · Groupie Tracker{{end}}
+
+
+{{define "content"}}
+<h1 class="page-title">Compare artists</h1>
+
+<form class="compare-form" action="/compare" method="get">
+  <div class="field">
+    <label for="cmp-a">First artist</label>
+    <select id="cmp-a" name="a" required>
+      <option value="">Choose an artist…</option>
+      {{range .All}}<option value="{{.ID}}"{{if eq .ID $.AID}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+  </div>
+  <div class="field">
+    <label for="cmp-b">Second artist</label>
+    <select id="cmp-b" name="b" required>
+      <option value="">Choose an artist…</option>
+      {{range .All}}<option value="{{.ID}}"{{if eq .ID $.BID}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+  </div>
+  <button type="submit" class="btn">Compare</button>
+</form>
+
+{{if .A}}
+<div class="table-wrap">
+  <table class="compare">
+    <caption class="visually-hidden">{{.A.Artist.Name}} compared with {{.B.Artist.Name}}</caption>
+    <thead>
+      <tr>
+        <th scope="col"><span class="visually-hidden">Attribute</span></th>
+        <th scope="col"><a href="/artist/{{.A.Artist.ID}}">{{.A.Artist.Name}}</a></th>
+        <th scope="col"><a href="/artist/{{.B.Artist.ID}}">{{.B.Artist.Name}}</a></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Photo</th>
+        <td><img src="{{.A.Artist.Image}}" alt="{{.A.Artist.Name}}" width="120" height="120"></td>
+        <td><img src="{{.B.Artist.Image}}" alt="{{.B.Artist.Name}}" width="120" height="120"></td>
+      </tr>
+      <tr>
+        <th scope="row">Created</th>
+        <td>{{.A.Artist.CreationDate}}</td>
+        <td>{{.B.Artist.CreationDate}}</td>
+      </tr>
+      <tr>
+        <th scope="row">First album</th>
+        <td>{{.A.Artist.FirstAlbum}}</td>
+        <td>{{.B.Artist.FirstAlbum}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Members</th>
+        <td>{{len .A.Artist.Members}}: {{range $i, $m := .A.Artist.Members}}{{if $i}}, {{end}}{{$m}}{{end}}</td>
+        <td>{{len .B.Artist.Members}}: {{range $i, $m := .B.Artist.Members}}{{if $i}}, {{end}}{{$m}}{{end}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Concert locations</th>
+        <td>{{.A.LocationCount}}</td>
+        <td>{{.B.LocationCount}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Shows</th>
+        <td>{{.A.ShowCount}}</td>
+        <td>{{.B.ShowCount}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Tour distance</th>
+        <td>{{if .A.DistanceReady}}{{.A.Distance}}{{else}}Still calculating…{{end}}</td>
+        <td>{{if .B.DistanceReady}}{{.B.Distance}}{{else}}Still calculating…{{end}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}

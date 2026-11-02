@@ -1,0 +1,53 @@
+/* ==========================================================================
+   Groupie Tracker - responsive rules. Works from 320px to 1440px+.
+   style.css is mobile first; this file only adds what bigger screens need.
+   ========================================================================== */
+
+/* Very small phones (320px): tighter gutters, one card column if needed. */
+@media (max-width: 380px) {
+  .container, .header-inner { padding: 0.75rem; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .card h2 { font-size: 0.95rem; margin: 0.5rem 0.6rem 0.2rem; }
+  .card p { margin: 0 0.6rem 0.6rem; font-size: 0.8rem; }
+  .facts { grid-template-columns: 1fr; }
+  .brand { font-size: 1.1rem; }
+  .map { height: 18rem; }
+}
+
+/* Tablets and up. */
+@media (min-width: 600px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+
+  .site-search { flex: 1 1 24rem; order: 0; }
+  .site-nav { margin-left: 0; }
+
+  .artist-head { grid-template-columns: 300px 1fr; align-items: start; }
+  .map { height: 26rem; }
+}
+
+/* Desktop: the filters become a permanent sidebar. */
+@media (min-width: 900px) {
+  .with-sidebar {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .filters { position: sticky; top: var(--space-3); margin-bottom: 0; max-height: calc(100vh - 2rem); overflow-y: auto; }
+  .filters-toggle { display: none; }
+  .filters form { display: block; margin-top: 0; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .map { height: 30rem; }
+}
+
+/* Large screens. */
+@media (min-width: 1440px) {
+  .container, .header-inner { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+}
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+  * { scroll-behavior: auto !important; }
+}

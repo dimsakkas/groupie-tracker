@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 )
 
 // templatesDir is a variable so tests can point it at a temporary directory.
@@ -112,5 +113,18 @@ func Recover(next http.Handler) http.Handler {
 			InternalError(w, r, fmt.Errorf("panic: %v", rec))
 		}()
 		next.ServeHTTP(tw, r)
+	})
+}
+
+// noDirListing stops the file server from showing a directory's contents
+// when a request ends in "/" (e.g. /static/css/) — it answers 404 instead.
+// Individual files (e.g. /static/css/style.css) are unaffected.
+func NoDirListing(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }

@@ -121,8 +121,8 @@ func Recover(next http.Handler) http.Handler {
 // Individual files (e.g. /static/css/style.css) are unaffected.
 func NoDirListing(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/") {
-			http.NotFound(w, r)
+		if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+			NotFound(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)

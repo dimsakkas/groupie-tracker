@@ -54,7 +54,7 @@ func main() {
 
 	// 4. Routes.
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", handlers.NoDirListing(http.FileServer(http.Dir("web/static")))))
 	mux.HandleFunc("GET /{$}", srv.HomeHandler)
 	mux.HandleFunc("GET /artist/{id}", srv.ArtistHandler)
 	mux.HandleFunc("GET /search", srv.SearchHandler)
